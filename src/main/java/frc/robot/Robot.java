@@ -23,7 +23,7 @@ public class Robot extends TimedRobot {
   CANSparkMax driveOne;
   CANSparkMax driveTwo;
   XboxController xboxController;
-  double maxSpeed = 0.1;
+  double maxSpeed = 0.4;
 
   @Override
   public void robotInit() {
