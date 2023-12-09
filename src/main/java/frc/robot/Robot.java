@@ -4,20 +4,11 @@
 
 package frc.robot;
 
-import com.revrobotics.CANSparkMax;
-import com.revrobotics.CANSparkMaxLowLevel.MotorType;
-
-import edu.wpi.first.hal.DriverStationJNI;
-import edu.wpi.first.util.WPIUtilJNI;
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.XboxController;
-import edu.wpi.first.wpilibj.internal.DriverStationModeThread;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
-import edu.wpi.first.wpilibj2.command.ScheduleCommand;
+import edu.wpi.first.wpilibj2.command.RepeatCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import frc.robot.commands.TurnDegrees;
@@ -31,13 +22,16 @@ public class Robot extends TimedRobot {
   XboxController xboxController;
   double maxSpeed = 0.4;
   DriveTrain driveTrain;
-  TurnDegrees turnDegrees;
 
   @Override
   public void robotInit() {
     xboxController = new XboxController(0);
     driveTrain = new DriveTrain();
-    turnDegrees = new TurnDegrees(driveTrain, 180);
+  }
+
+  @Override
+  public void robotPeriodic() {
+    CommandScheduler.getInstance().run();
   }
 
   public void disabled() {}
@@ -48,10 +42,11 @@ public class Robot extends TimedRobot {
   public void autonomousInit() {
 
       new SequentialCommandGroup(
-        new InstantCommand(() -> driveTrain.setMotorSpeeds(0.5, 0.5), driveTrain),
-        new WaitCommand(3.0),
-        turnDegrees.withTimeout(1.5),
-        new InstantCommand(() -> driveTrain.setMotorSpeeds(0.5, 0.5), driveTrain)
+        new RepeatCommand(new InstantCommand(() -> driveTrain.setMotorSpeeds(0.5, 0.5), driveTrain))
+          .raceWith(new WaitCommand(3)),
+        new TurnDegrees(driveTrain, 180),
+        new InstantCommand(() -> driveTrain.setMotorSpeeds(0.5, 0.5), driveTrain).repeatedly()
+          .raceWith(new WaitCommand(3))
       ).schedule();
 
   }
@@ -67,8 +62,8 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopPeriodic() {
     
-      double speed1 = xboxController.getLeftY() * maxSpeed;
-      double speed2 = xboxController.getRightY() * maxSpeed;
+      double speed1 = -xboxController.getLeftY() * maxSpeed; // y is inverse on the controller
+      double speed2 = -xboxController.getRightY() * maxSpeed;
 
       if (Math.abs(speed1) < 0.03) {
         speed1 = 0.0;
