@@ -4,6 +4,7 @@
 
 package frc.robot;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -20,8 +21,12 @@ import frc.robot.subsystems.DriveTrain;
  */
 public class Robot extends TimedRobot {
   XboxController xboxController;
-  double maxSpeed = 0.4;
+  double maxSpeed = 0.5;
   DriveTrain driveTrain;
+  
+  private double floorMod(double x, double y) {
+    return x - Math.floor(x/y) * y;
+  }
 
   @Override
   public void robotInit() {
@@ -59,11 +64,36 @@ public class Robot extends TimedRobot {
 
   }
 
+  enum DriveMode {
+    TANK, STEER, GYRO;
+  }
+  static DriveMode driveMode = DriveMode.STEER;
+  double lastSteerSpeed = 0.0;
+
   @Override
   public void teleopPeriodic() {
-    
-      double speed1 = -xboxController.getLeftY() * maxSpeed; // y is inverse on the controller
-      double speed2 = -xboxController.getRightY() * maxSpeed;
+    double speed1, speed2;
+    if (xboxController.getXButtonPressed()) {
+      driveTrain.zeroYaw();
+    }
+    if (xboxController.getAButtonPressed()) {
+      switch (driveMode) {
+        case TANK:
+          driveMode = DriveMode.STEER;
+          break;
+        case STEER:
+          driveMode = DriveMode.GYRO;
+          break;
+        case GYRO:
+          driveMode = DriveMode.TANK;
+          break;
+      }
+      System.out.println(driveMode);
+    }
+    if (driveMode == DriveMode.TANK) {
+      lastSteerSpeed = 0.0;
+      speed1 = -xboxController.getLeftY() * maxSpeed; // y is inverse on the controller
+      speed2 = -xboxController.getRightY() * maxSpeed;
 
       if (Math.abs(speed1) < 0.03) {
         speed1 = 0.0;
@@ -72,8 +102,41 @@ public class Robot extends TimedRobot {
       if (Math.abs(speed2) < 0.03) {
         speed2 = 0.0;
       }
+    } else {
+      double speed = -xboxController.getLeftY(); // y is inverse on the controller
+      double turn = xboxController.getRightX()/2;
+      if (driveMode == DriveMode.GYRO) {
+        double x = xboxController.getLeftX();
+        double y = -xboxController.getLeftY();
 
-      driveTrain.setMotorSpeeds(speed1, speed2);
+        double power = Math.min(Math.hypot(x, y), 1.0);
+        double angle = Math.atan2(y, x);
+
+        if (power > 0.05) {
+          double angleTurn = (driveTrain.getYaw() - Math.toDegrees(angle));
+          speed = power;
+          angleTurn = floorMod(angleTurn + 180, 360) - 180;
+          // System.out.println(angleTurn
+          // + " = " + Math.toDegrees(angle)
+          // + " - " + driveTrain.getYaw());
+          if (angleTurn < -90 || angleTurn > 90) {
+            speed *= -1;
+            angleTurn = (angleTurn+270)%180-90;
+            // System.out.println("inverted to " + angleTurn);
+          }
+          speed *= 1-Math.abs(angleTurn/90);
+          // System.out.println("power " + speed);
+          turn = MathUtil.clamp(angleTurn/180, -1, 1);
+        } else {
+          speed = 0;
+          turn = 0;
+        }
+      } // end GYRO mode
+
+      speed1 = MathUtil.clamp(speed + turn, -1, 1)*maxSpeed;
+      speed2 = MathUtil.clamp(speed - turn, -1, 1)*maxSpeed;
+    }
+    driveTrain.setMotorSpeeds(speed1, speed2);
   }
 
   public void test() {}

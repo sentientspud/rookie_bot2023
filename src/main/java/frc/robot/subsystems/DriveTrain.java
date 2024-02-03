@@ -47,8 +47,14 @@ public class DriveTrain extends SubsystemBase {
         driveTwo.getEncoder().setPosition(0.0);
     }
 
+    double gyroOffset = 0.0;
     public double getYaw() {
-        return gyro.getYaw().getValue();
+        return gyro.getYaw().getValue() + gyroOffset;
+    }
+
+    public void zeroYaw() {
+        gyroOffset = 0.0;
+        gyroOffset = -getYaw();
     }
 
     public Pigeon2 getGyro() {
